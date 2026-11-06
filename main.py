@@ -13,7 +13,7 @@ def main():
     print("\n============ VALIDATED RESULT ============")
     print(f"Iterations : {res['iteration']}")
     print(f"Quality score : {res['score']}/10")
-    print(f"Control report :\n{res['critic_notes']}")
+    print(f"Control report :\n{res['critic']}")
     print(f"\nFinal answer :\n{res['final_answer']}")
 
 if __name__ == "__main__":

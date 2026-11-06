@@ -1,19 +1,28 @@
 from langgraph.graph import StateGraph, END
 from src.state import AgentState
-from src.nodes import researcher_node, analyst_node, critic_node
+from src.nodes import (
+    researcher_node,
+    analyst_node,
+    critic_node,
+    orchestrator_node,
+    synthesizer_node
+)
 
 # 1. Instantiate the StateGraph with the AgentState type
 workflow = StateGraph(AgentState)
 
 # 2. Add nodes to the graph
+workflow.add_node("orchestrator", orchestrator_node)
 workflow.add_node("researcher", researcher_node)
 workflow.add_node("analyst", analyst_node)
 workflow.add_node("critic", critic_node)
+workflow.add_node("synthesizer", synthesizer_node)
 
 # 3. Define the entry point of the workflow
-workflow.set_entry_point("researcher")
+workflow.set_entry_point("orchestrator")
 
 # 4. Establish edges between nodes to define the flow of the workflow
+workflow.add_edge("orchestrator", "researcher")
 workflow.add_edge("researcher", "analyst")
 workflow.add_edge("analyst", "critic")
 
@@ -34,10 +43,12 @@ workflow.add_conditional_edges(
     "critic",
     decide_next_step,
     {
-        END: END,
+        "synthesizer": "synthesizer",
         "analyst": "analyst"
     }
 )
+
+workflow.add_edge("synthesizer", END)
 
 # 6. Graph compilation
 app = workflow.compile()

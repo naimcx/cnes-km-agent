@@ -1,0 +1,9 @@
+use_default_settings: true
+server:
+  secret_key: "cnes_agent_km_secret_key"
+  bind_address: "0.0.0.0"
+search:
+  safe_search: 0
+  formats:
+    - html
+    - json
