@@ -1,7 +1,7 @@
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.vectorstores import Chroma
+from langchain_chroma import Chroma
+from langchain_huggingface import HuggingFaceEmbeddings
 
 CHROMA_PATH = "./chroma_db_cnes"
 
@@ -13,8 +13,7 @@ def build_vectorstore():
     """Builds a vectorstore from the CNES PDF documents."""
     # Load documents from PDF files
     pdf_files = [
-        "data/ariane6_datasheet.pdf",
-        "data/ariane5_datasheet.pdf"
+        "data/Mua-6_Issue-2_Revision-0_March-2021.pdf"
     ]
     docs = []
     

@@ -1,10 +1,10 @@
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
-from tools import search_docs
-from state import AgentState
+from src.tools import search_docs
+from src.state import AgentState
 
 load_dotenv()
-llm = ChatGroq(model_name="llama-3.1-8b-instant", temperature=0)
+llm = ChatGroq(model_name="openai/gpt-oss-120b", temperature=0)
 
 # NODE 1 : Researcher
 def researcher_node(state: AgentState):

@@ -1,6 +1,6 @@
 from langgraph.graph import StateGraph, END
-from state import AgentState
-from nodes import researcher_node, analyst_node, critic_node
+from src.state import AgentState
+from src.nodes import researcher_node, analyst_node, critic_node
 
 # 1. Instantiate the StateGraph with the AgentState type
 workflow = StateGraph(AgentState)

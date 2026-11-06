@@ -2,3 +2,4 @@
 .env
 chroma_db_cnes/
 __pycache__/
+*.pdf

@@ -3,8 +3,9 @@ from typing import TypedDict, List
 from dotenv import load_dotenv
 
 from langchain_groq import ChatGroq
-from langchain_community.vectorstores import Chroma, FAISS
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_chroma import Chroma
+from langchain_community.vectorstores import FAISS
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_core.documents import Document
 from langgraph.graph import StateGraph, END
 
@@ -17,7 +18,7 @@ cnes_corpus = [
     Document(page_content="Ariane 6 uses the Vulcain 2.1 engine for its cryogenic main stage, which operates on liquid hydrogen and liquid oxygen.", metadata={"source": "dts_propulsion_01"}),
     Document(page_content="The upper stage of Ariane 6 is propelled by the reusable Vinci engine, enabling missions to complex multi-orbit scenarios.", metadata={"source": "dts_propulsion_02"}),
     Document(page_content="The auxiliary solid rocket boosters (ESR) of Ariane 6 are available in A62 (2 boosters) and A64 (4 boosters) versions.", metadata={"source": "dts_lanceurs_03"}),
-    Document(page_content="The CNES is responsible for the engineering and management of the European launch vehicle ELA-4, located at the Guiana Space Center in Kourou.", metadata={"source": "cnes_csg_04"})
+    Document(page_content="The CNES is responsible for the engineering and management of the European launch vehicle ELA-4, located at the Guiana Space Center in Kourou.", metadata={"source": "cnes_csg_04"}),
 ]
 
 print("Initializing vector database with CNES documents...")
@@ -40,7 +41,7 @@ class AgentState(TypedDict):
     final_answer: str
 
 # Initialize the LLM
-llm = ChatGroq(model_name="llama-3.1-8b-instant", temperature=0)
+llm = ChatGroq(model_name="openai/gpt-oss-120b", temperature=0)
 
 # -------------------------------------------------------------
 # 3. Nodes for Agent graph (LangGraph)

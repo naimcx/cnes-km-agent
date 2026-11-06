@@ -1,5 +1,5 @@
 from langchain_core.tools import tool
-from rag_corpus import load_vectorstore
+from src.rag_corpus import load_vectorstore
 
 vectorstore = load_vectorstore()
 

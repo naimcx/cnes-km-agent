@@ -8,7 +8,7 @@ load_dotenv()
 # 2. Instantiate the LLM
 # temperature=0 ensures that the model's responses are consistent and reproducible.
 llm = ChatGroq(
-    model_name="llama-3.1-8b-instant",
+    model_name="openai/gpt-oss-120b",
     temperature=0
 )
 
