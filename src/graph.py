@@ -1,12 +1,25 @@
 from langgraph.graph import StateGraph, END
 from src.state import AgentState
 from src.nodes import (
+    orchestrator_node,
     researcher_node,
     analyst_node,
     critic_node,
-    orchestrator_node,
+    self_reflection_node,
     synthesizer_node
 )
+
+# ===========================================
+# WORKFLOW EXECUTION PARAMETERS
+# ===========================================
+
+# Maximum number of iterations for the Actor-Critic loop
+MAX_REFLECTION_CYCLES = 3
+
+
+# ===========================================
+# GRAPH DEFINITION
+# ===========================================
 
 # 1. Instantiate the StateGraph with the AgentState type
 workflow = StateGraph(AgentState)
@@ -16,6 +29,7 @@ workflow.add_node("orchestrator", orchestrator_node)
 workflow.add_node("researcher", researcher_node)
 workflow.add_node("analyst", analyst_node)
 workflow.add_node("critic", critic_node)
+workflow.add_node("self_reflection", self_reflection_node)
 workflow.add_node("synthesizer", synthesizer_node)
 
 # 3. Define the entry point of the workflow
@@ -26,47 +40,55 @@ workflow.add_edge("orchestrator", "researcher")
 workflow.add_edge("researcher", "analyst")
 workflow.add_edge("analyst", "critic")
 
-# 5. Conditional edges (Actor-Critic loop)
-def decide_next_step(state: AgentState):
-    """Decides whether to validate the answer or have the analyst redo it."""
-    score = state.get("score", 0)
-    iterations = state.get("iteration", 0)
+
+# ===========================================
+# CONDITIONAL ROUTING BASED ON NODE OUTPUTS
+# ===========================================
+
+def decide_after_critic(state: AgentState):
+    """Decides whether to go to the synthesizer or to the self-reflection node based on the critic's feedback."""
+    is_valid = state.get("is_valid", False)
+    cycles = state.get("reflection_cycle", 0)
     
-    # If the score is good or if we have already made 2 attempts, we stop (safeguard)
-    if score >= 7 or iterations >= 2:
-        return END
-    else:
-        print(f"\n[Critical Alert] Insufficient score ({score}/10). Re-routing to the analyst...")
-        return "analyst"
+    # Exit condition
+    if is_valid or cycles >= MAX_REFLECTION_CYCLES:
+        return "synthesizer"
+    return "self_reflection"
 
 workflow.add_conditional_edges(
     "critic",
-    decide_next_step,
+    decide_after_critic,
     {
         "synthesizer": "synthesizer",
+        "self_reflection": "self_reflection"
+    }
+)
+
+def decide_after_self_reflection(state: AgentState):
+    """Decides whether to go back to the researcher for re-searching or to the analyst for re-writing."""
+    action_type = state.get("action_type", "re_write")
+    if action_type == "re_search":
+        print("[Self-reflection] suggests re-searching. Going back to the researcher.")
+        return "researcher"
+    else:
+        print("[Self-reflection] suggests re-writing. Going back to the analyst.")
+        return "analyst"
+
+workflow.add_conditional_edges(
+    "self_reflection",
+    decide_after_self_reflection,
+    {
+        "researcher": "researcher",
         "analyst": "analyst"
     }
 )
 
+# Terminate workflow execution after the synthesizer node
 workflow.add_edge("synthesizer", END)
 
-# 6. Graph compilation
-app = workflow.compile()
 
-# 7. Interactive test
-if __name__ == "__main__":
-    question = "What is the different types of Ariane 6 and what engines do they use ?"
-    print(f"--- Starting the query : {question} ---")
-    
-    initial_state = {
-        "question": question,
-        "iteration": 0
-    }
-    
-    result = app.invoke(initial_state)
-    
-    print("\n================ FINAL RESULT ================")
-    print(f"Number of iterations : {result['iteration']}")
-    print(f"Validation score : {result['score']}/10")
-    print(f"Reviewer's note :\n{result['critic_notes']}")
-    print(f"\nValidated response :\n{result['final_answer']}")
+# ===========================================
+# GRAPH COMPILATION
+# ===========================================
+
+app = workflow.compile()
