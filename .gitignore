@@ -1,5 +1,17 @@
+# envs
 .venv/
 .env
-chroma_db_cnes/
-__pycache__/
+
+# DB
+chroma_db/
+qdrant_db/
+
+# data
+data/
+static/
 *.pdf
+*.png
+
+# cache
+__pycache__/
+.vscode/
