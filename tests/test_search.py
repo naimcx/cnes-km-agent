@@ -13,6 +13,7 @@ def test_qdrant_retriever():
     for q in queries:
         print(f"\n================ QUERY: {q} ================")
         nodes = retriever.retrieve(q)
+        assert len(nodes) > 0, f"No results found for query: {q}"
         print(f"Number of results : {len(nodes)}")
         for i, node in enumerate(nodes):
             page = node.metadata.get("page_label", "N/A")
@@ -22,4 +23,4 @@ def test_qdrant_retriever():
             print(f"Chunk : {node.text[:150]}...\n")
             img_path = node.metadata.get("image_path", "")
             has_drawings = node.metadata.get("has_drawings", False)
-            print(f"Schéma détecté : {has_drawings} | Image : {img_path if img_path else 'Aucune'}")
+            print(f"Diagram detexted : {has_drawings} | Image : {img_path if img_path else 'None'}")

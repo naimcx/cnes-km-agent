@@ -1,19 +1,7 @@
-from langchain_groq import ChatGroq
-from src.config import (
-    GROQ_API_KEY,
-    GROQ_TEXT_MODEL,
-)
+from src.config import llm
 
-def test_llm_groq_connection():
-
-    # Instantiate the LLM
-    # temperature=0 ensures that the model's responses are consistent and reproducible.
-    llm = ChatGroq(
-        model_name=GROQ_TEXT_MODEL,
-        api_key=GROQ_API_KEY,
-        temperature=0
-    )
-    
+def test_active_llm_connection():
+    """Test the connection to the active LLM by sending a simple prompt and checking for a valid response."""
     response = llm.invoke("Hello, confirm that you are working correctly.")
     assert response.content != ""
     
