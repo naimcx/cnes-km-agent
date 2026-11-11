@@ -1,27 +1,19 @@
 import re
 import json
 from pathlib import Path
-from typing import List, Dict, Any
-from dotenv import load_dotenv
-
 from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage
-from langchain_core.tools import BaseTool
 
-from src.tools import search_docs_hybrid, inspect_pdf_page_image, search_web, fetch_wikipedia
+from src.tools import ALL_TOOLS
 from src.config import llm
 from src.state import AgentState
 from schema.pydantic_schema import CriticOutput, ReflectionOutput, OrchestratorPlan
+from src.services.prompt_loader import get_node_prompt, get_skill_prompt
 
 
 # =============================================
 # LOAD ENVIRONMENT VARIABLES AND INITIALIZE LLM
 # =============================================
 
-load_dotenv()
-
-INTERNAL_TOOLS = [search_docs_hybrid, inspect_pdf_page_image]
-EXTERNAL_TOOLS = [search_web, fetch_wikipedia]
-ALL_TOOLS = [search_docs_hybrid, inspect_pdf_page_image, search_web, fetch_wikipedia]
 TOOLS_REGISTRY = {tool.name: tool for tool in ALL_TOOLS}
 
 # Bind the LLM with all tools
@@ -65,15 +57,7 @@ def extract_fallback_tool_calls(text: str) -> list[dict]:
 
 def orchestrator_node(state: AgentState):
     """Orchestrates the workflow based on the question type."""
-    system_prompt = (
-        "You are the chief mission planner for a CNES technical assistant.\n"
-        "Classify the query scope:\n"
-        "- 'internal': specifically about Ariane 6, its manual, stages, fairing, interfaces, or CNES procedures.\n"
-        "- 'external': physics theory, general astrodynamics, space law, or launch competitors (Falcon 9, Vulcan, New Glenn, Starship).\n"
-        "- 'hybrid': cross-comparison between Ariane 6 and external rockets or external physics principles.\n"
-        "CRITICAL SEARCH LANGUAGE RULES:\n"
-        "Formulate search queries strictly in concise English technical keywords"
-    )
+    system_prompt = get_node_prompt("orchestrator")
     user_prompt = (
         f"Question : {state['question']}\n"
     )
@@ -107,19 +91,11 @@ def researcher_node(state: AgentState):
     plan = state.get("plan", "")
     critic_feedback = state.get("critic", "")
 
-    system_prompt = (
-        "You are an expert technical researcher for CNES.\n"
-        "Perform precise, fact-grounded investigation to collect verified documentary evidence.\n\n"
-        "WORKFLOW:\n"
-        "1. Issue targeted queries with 'search_docs_hybrid' using English technical terms.\n"
-        "2. Examine returned chunks: it's announced figures that are printed on the subsequent page "
-        "(e.g. text on page 83 announces Figure 5.3.1a on page 84; "
-        "3. When search results reference a diagram, figure, or drawing (e.g. Figure 5.3.1a on page 84, "
-        "or Picture 5.3.4.a on page 89), IMMEDIATELY call 'inspect_pdf_page_image' with that page number to extract dimensions, mechanisms or to see if the drawing is relevant.\n"
-        "4. Once both text and visual measurements are gathered, conclude with a factual synthesis once all requested metrics are found."
-    )
-
+    system_prompt = get_node_prompt("researcher")
+    calc_skill = get_skill_prompt("aerospace-calc")
+    system_prompt += f"\n\n{calc_skill}\n"
     user_prompt = f"Target Question: {question}\nPlan: {plan}\n"
+
     if critic_feedback:
         user_prompt += f"\nPrevious critic Alert: {critic_feedback}\n"
 
@@ -143,7 +119,8 @@ def researcher_node(state: AgentState):
 
         # If no tool calls are returned, assume the LLM has completed its research and append the final content to context
         if not tool_calls:
-            context.append(response.content)
+            if not context and response.content:
+                context.append(response.content)
             break
 
         # 2. Iterate through each tool call, invoke the corresponding tool, and append the results to context and history
@@ -152,7 +129,6 @@ def researcher_node(state: AgentState):
             t_args = tool_call.get("args", {}) or tool_call.get("parameters", {})
             t_id = tool_call.get("id", f"call_{t_name}_{step}")
 
-            # Inject the original question into the tool arguments if the tool is 'inspect_pdf_page_image' and no question is provided
             if t_name == "inspect_pdf_page_image" and "question" not in t_args:
                 t_args["question"] = question
 
@@ -181,18 +157,7 @@ def analyst_node(state: AgentState):
     """
     feedback = state.get("critic", "")
 
-    system_prompt = (
-        "You are a technical analyst for CNES Space Transport.\n"
-        "DATA FIDELITY & INTEGRITY RULES:\n"
-        "1. Every single parameter, component name, dimension (Ø), or unit MUST be transcribed strictly from context.\n"
-        "2. GROUND vs FLIGHT HARDWARE: Never confuse ground integration buildings (e.g. clean rooms, BAF-HE) "
-        "with launcher flight hardware (fairing, stage structures, adapter interfaces).\n"
-        "3. ACCESSIBILITY vs SEPARATION: Differentiate access door panels (and their explicit functions) from "
-        "pyrotechnic separation lines (HSS/VSS) and separation actuators (spring packages).\n"
-        "4. VOLUMES & ENVELOPES: If a user manual defines an envelope via boundary dimensions (diameters, lengths) "
-        "without publishing an integrated volume in m³, explicitly state that the envelope is defined geometrically.\n"
-        "5. NEVER extrapolate or calculate values with invented parameters. Provide verified sources for every claim."
-    )
+    system_prompt = get_node_prompt("analyst")
     user_prompt = (
         f"Question : {state['question']}\n"
         f"Documentary context verified & Visual Context :\n{state['context']}\n\n"
@@ -217,13 +182,7 @@ def analyst_node(state: AgentState):
 
 def critic_node(state: AgentState):
     """Verifies strict compliance with the documents and assigns a score (anti-hallucination)."""
-    system_prompt = (
-        "You are the quality control officer for CNES space documentation.\n"
-        "Audit the analyst's draft against the source context:\n"
-        "- Flag any invented dimension, assumed height/volume, or unverified specification.\n"
-        "- Ensure access doors are not confused with separation systems.\n"
-        "- Approve only if every claim is grounded in the text or visual reports."
-    )
+    system_prompt = get_node_prompt("critic")
     user_prompt = (
         f"Question : {state['question']}\n"
         f"Source Context :\n{state['context']}\n\n"
@@ -258,15 +217,7 @@ def self_reflection_node(state: AgentState):
     2. If the critic flagged hallucinations or misformatting, provide clear instructions for the analyst to correct the draft.
     3. Return a structured output with the root cause, action type, and corrective plan
     """
-    system_prompt = (
-        "You are a self-reflection supervisor for a CNES technical assistant.\n"
-        "Determine the root cause of why the draft was flagged by the critic:\n"
-        "- Choose 're_search': if ANY specific metric, figure, or requirement requested by the user "
-        "is missing from the context (whether it requires text retrieval or diagram inspection). "
-        "Provide clear suggestions for what to look up.\n"
-        "- Choose 're_write': ONLY if all required data points already exist clearly within the retrieved context, "
-        "but the analyst hallucinated, misformatted, or made an arithmetic error."
-    )
+    system_prompt = get_node_prompt("self_reflection")
     user_prompt = (
         f"User Question: {state['question']}\n\n"
         f"Available Context: {state.get('context', [])}\n\n"
@@ -311,17 +262,21 @@ def synthesizer_node(state: AgentState):
     The synthesizer must not hallucinate or invent any data, and must not extrapolate or calculate values with invented parameters.
     Extracts certified images referenced in the context and appends them as Markdown image links with captions derived from the file name without hallucinating or inventing URL paths.
     """
-    system_prompt = (
-        "You are an expert technical communicator for CNES.\n"
-        "Format the verified dimensions into clear markdown tables and bullet points.\n"
-        "STRICT VISUAL LINK RULES:\n"
-        "DO NOT output any image markdown link (e.g., ![...](...)). "
-        "The system automatically appends verified document figures to the end of your response."
-    )
+    system_prompt = get_node_prompt("synthesizer")
+    context_list = state.get("context", [])
+    context_str = "\n".join(context_list)
+
+    key_findings = [
+        c for c in context_list
+        if "[inspect_pdf_page_image]" in c or "[calculate_aerospace_math]" in c
+    ]
+    findings_str = "\n\n".join(key_findings) if key_findings else context_str
+
     user_prompt = (
         f"Question: {state['question']}\n\n"
+        f"Verified Visual & Mathematical Findings:\n{findings_str}\n\n"
         f"Verified Technical Data:\n{state['analysis']}\n\n"
-        f"Review: {state.get('critic', 'Approved')}\n"
+        f"Answer ONLY the user's question clearly and concisely using the verified numbers above."
     )
 
     response = llm.invoke([
@@ -333,9 +288,10 @@ def synthesizer_node(state: AgentState):
     # Extract certified image paths recorded during document retrieval and visual inspection
     context_str = "\n".join(state.get("context", []))
 
-    # Use regex to find the first occurrence of an associated page image in the context
-    match_img = re.search(r'\[Associated Page Image\]:\s*(\S+)', context_str)
-    real_image_url = match_img.group(1) if match_img else ""
+    # Prioritize images explicitly inspected by the vision tool, or take the last retrieved image
+    inspected_imgs = re.findall(r'\[Visual Inspection Page \d+\]:.*?\[Associated Page Image\]:\s*(\S+)', context_str, re.DOTALL)
+    all_imgs = re.findall(r'\[Associated Page Image\]:\s*(\S+)', context_str)
+    real_image_url = inspected_imgs[-1] if inspected_imgs else (all_imgs[-1] if all_imgs else "")
 
     # Programmatically append the first certified visual attachment to avoid hallucinated URLs
     if real_image_url:
