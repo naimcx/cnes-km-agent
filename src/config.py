@@ -75,7 +75,7 @@ RAG_DB = os.getenv("RAG_DB", "qdrant") # "qdrant" | "chroma_db" | "faiss"
 RAG_MODE = os.getenv("RAG_MODE", "hybrid") # "hybrid" | "vector" | "keyword"
 
 # Qdrant configuration
-QDRANT_HOST = os.getenv("QDRANT_HOST", "http://localhost:6333")
+QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
 QDRANT_PORT = int(os.getenv("QDRANT_PORT", 6333))
 COLLECTION_NAME = os.getenv("COLLECTION_NAME", "cnes_km_agent")
 
@@ -83,9 +83,13 @@ COLLECTION_NAME = os.getenv("COLLECTION_NAME", "cnes_km_agent")
 SEARX_HOST = os.getenv("SEARX_HOST", "http://localhost:8080")
 
 # Path configurations for data, Chroma DB, and images
-DATA_PATH = Path(os.getenv("DATA_PATH", "data"))
-CHROMA_PATH = Path(os.getenv("CHROMA_PATH", "./chroma_db"))
-IMG_PATH = Path(os.getenv("IMG_PATH", "./static/pdf_images"))
+ROOT_DIR = Path(__file__).resolve().parent.parent
+PROMPTS_DIR = ROOT_DIR / "prompts"
+SKILLS_DIR = ROOT_DIR / "skills"
+
+DATA_PATH = ROOT_DIR / os.getenv("DATA_PATH", "data")
+CHROMA_PATH = ROOT_DIR / os.getenv("CHROMA_PATH", "chroma_db")
+IMG_PATH = ROOT_DIR / os.getenv("IMG_PATH", "static/pdf_images")
 
 # Ensure the image path exists
 IMG_PATH.mkdir(parents=True, exist_ok=True)
@@ -93,3 +97,7 @@ IMG_PATH.mkdir(parents=True, exist_ok=True)
 # Default PDF path for testing
 TEST_PDF_NAME = os.getenv("TEST_PDF_NAME", "Mua-6_Issue-2_Revision-0_March-2021.pdf")
 DEFAULT_PDF_PATH = DATA_PATH / TEST_PDF_NAME
+
+PDF_PARSER_TYPE = os.getenv("PDF_PARSER_TYPE", "docling") # "docling" | "pymupdf" | "unstructured"
+UNSTRUCTURED_STRATEGY = os.getenv("UNSTRUCTURED_STRATEGY", "fast") # "fast" | "hi_res"
+PRE_RENDER_IMAGES = os.getenv("PRE_RENDER_IMAGES", True) # True | False
